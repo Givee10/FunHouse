@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0a0c10">
+<title>Табло</title>
+<style>
+  :root { --bg:#0a0c10; --card:#141820; --accent:#4f8cff; --ok:#3dd68c; --warn:#ffb347; --text:#f2f4fa; --muted:#8a8f9e; --optbg:#1e222c; }
+  body.light { --bg:#f2f4fa; --card:#ffffff; --accent:#2f6bff; --ok:#1fa866; --warn:#d98a1f; --text:#1a1d24; --muted:#5a6070; --optbg:#eef1f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:1200px; margin:0 auto; padding:20px; }
+  h1 { font-size:36px; margin:0 0 4px; }
+  .muted { color:var(--muted); }
+  .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  input, button { font:inherit; padding:12px 16px; border-radius:12px; border:1px solid #2a2f3a; background:#141820; color:var(--text); font-size:16px; }
+  button { background:var(--accent); border:0; cursor:pointer; font-weight:700; }
+  .card { background:var(--card); border-radius:20px; padding:24px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; font-size:24px; }
+  th, td { padding:16px 12px; text-align:left; border-bottom:1px solid #2a2f3a; }
+  th { color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:1px; }
+  tr.top td { color:var(--ok); font-weight:800; }
+  tr.top2 td { font-weight:700; }
+  .timer { font-size:96px; font-weight:900; text-align:center; margin:8px 0; line-height:1; }
+  .q { font-size:30px; font-weight:700; text-align:center; margin:12px 0; line-height:1.2; }
+  .progress { text-align:center; color:var(--muted); font-size:16px; margin-bottom:8px; }
+  .opts { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:1000px; margin:16px auto 0; }
+  .opt { padding:20px; border-radius:14px; background:var(--optbg); text-align:center; font-size:22px; border:2px solid transparent; }
+  .opt.correct { background:var(--ok); color:#06210f; border-color:var(--ok); font-weight:700; }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; background:#22262f; font-size:14px; color:var(--muted); }
+  .pill .dot { width:10px; height:10px; border-radius:50%; background:var(--bad); }
+  .pill.on .dot { background:var(--ok); }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+  .timer.warn { animation: pulse 0.6s infinite; color: var(--warn); }
+  .timer.danger { animation: pulse 0.4s infinite; color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row">
+    <h1>Табло</h1>
+    <div class="pill" id="connPill"><span class="dot"></span><span id="connText">не подключено</span></div>
+    <input id="pin" placeholder="PIN игры" style="flex:1; min-width:160px">
+    <button onclick="toggleTheme()" id="themeBtn">🌙</button>
+    <button onclick="connect()">Подключить</button>
+  </div>
+
+  <div class="card">
+    <div class="progress" id="progress"></div>
+    <div class="timer" id="timer"></div>
+    <div class="q" id="qtext">Подключитесь к игре</div>
+    <div class="opts" id="opts"></div>
+    <div id="roundResults" style="margin-top:16px"></div>
+    <div class="muted" id="answerProgress" style="text-align:center;margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px; font-size:22px">Рейтинг</h2>
+    <table><thead><tr><th>#</th><th>Игрок</th><th>Викторина</th><th>Ручные</th><th>Всего</th></tr></thead><tbody id="boardBody"></tbody></table>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io({ transports: ['websocket','polling'] });
+let pin = null, timerIv = null, totalSec = 0, serverOffset = 0;
+function connect() {
+  pin = document.getElementById('pin').value.trim();
+  if (!pin) return;
+  socket.emit('join_board', { pin });
+}
+socket.on('connect', () => setConn(true));
+socket.on('disconnect', () => setConn(false));
+function setConn(on) {
+  const pill = document.getElementById('connPill');
+  const txt = document.getElementById('connText');
+  if (!pill) return;
+  pill.classList.toggle('on', on);
+  txt.textContent = on ? 'онлайн' : 'нет связи';
+}
+socket.on('joined', () => { document.getElementById('connText').textContent = 'подключено: ' + pin; document.getElementById('connPill').classList.add('on'); });
+
+socket.on('question_open', d => {
+  serverOffset = (d.serverTime || Date.now()) - Date.now();
+  document.getElementById('qtext').textContent = d.text;
+  document.getElementById('progress').textContent = 'Вопрос ' + d.index + ' из ' + d.total;
+  totalSec = d.time;
+  const opts = document.getElementById('opts');
+  opts.innerHTML = '';
+  d.opts.forEach((o,i) => {
+    const el = document.createElement('div');
+    el.className = 'opt';
+    el.innerHTML = `<b>${i+1}.</b> ${esc(o)}`;
+    opts.appendChild(el);
+  });
+  startTimer(d.endsAt);
+});
+function startTimer(endsAt) {
+  if (timerIv) clearInterval(timerIv);
+  const adjEnds = endsAt - serverOffset;
+  const el = document.getElementById('timer');
+  const tick = () => {
+    const leftMs = Math.max(0, adjEnds - Date.now());
+    const left = Math.ceil(leftMs / 1000);
+    el.textContent = left;
+    el.classList.remove('warn','danger');
+    if (totalSec > 0) {
+      const frac = leftMs / (totalSec * 1000);
+      if (frac < 0.33) el.classList.add('danger');
+      else if (frac < 0.66) el.classList.add('warn');
+    }
+    if (left <= 0) clearInterval(timerIv);
+  };
+  tick();
+  timerIv = setInterval(tick, 250);
+}
+socket.on('answer_progress', d => {
+  const el = document.getElementById('answerProgress');
+  if (el) el.textContent = 'Ответили: ' + d.answered + ' из ' + d.total;
+});
+socket.on('reveal', d => {
+  if (timerIv) { clearInterval(timerIv); timerIv = null; }
+  const tel = document.getElementById('timer');
+  if (tel) tel.textContent = '0';
+  document.querySelectorAll('.opt').forEach((b,i) => {
+    if (i === d.correct) b.classList.add('correct');
+  });
+  const rr = document.getElementById('roundResults');
+  if (rr && Array.isArray(d.players)) {
+    rr.innerHTML = '<h3 style="margin:0 0 8px;font-size:18px">Результаты раунда</h3>' +
+      d.players.map(p => {
+        const cls = p.correct ? 'color:var(--ok)' : (p.choice === null ? 'color:var(--muted)' : 'color:var(--bad)');
+        const mark = p.correct ? '✓' : (p.choice === null ? '—' : '✗');
+        return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a2f3a">
+          <span>${esc(p.nick)}</span><span style="${cls};font-weight:700">${mark} ${p.choice === null ? 'не ответил' : (p.choice+1)}</span></div>`;
+      }).join('');
+  }
+});
+socket.on('finished', () => { if (timerIv) { clearInterval(timerIv); timerIv = null; } document.getElementById('qtext').textContent = 'Игра завершена'; document.getElementById('timer').textContent = ''; document.getElementById('progress').textContent = 'Финиш'; const rr = document.getElementById('roundResults'); if (rr) rr.innerHTML = ''; const ap = document.getElementById('answerProgress'); if (ap) ap.textContent = ''; });
+socket.on('leaderboard', rows => {
+  const tb = document.getElementById('boardBody');
+  tb.innerHTML = '';
+  rows.forEach((r,i) => {
+    const tr = document.createElement('tr');
+    if (i === 0) tr.classList.add('top');
+    else if (i === 1) tr.classList.add('top2');
+    tr.innerHTML = `<td>${i+1}</td><td>${esc(r.nick.replace('__board__',''))}</td><td>${r.correct}</td><td>${r.manual}</td><td><b>${r.total}</b></td>`;
+    tb.appendChild(tr);
+  });
+});
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('fh_theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+}
+(function initTheme(){
+  const t = localStorage.getItem('fh_theme') || 'dark';
+  if (t === 'light') document.body.classList.add('light');
+  const b = document.getElementById('themeBtn');
+  if (b) b.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+})();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Игра</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --accent:#4f8cff; --ok:#3dd68c; --bad:#ff5d6c; --warn:#ffb347; --text:#e8eaf0; --muted:#8a8f9e; --optbg:#22262f; --pillbg:#22262f; }
+  body.light { --bg:#f2f4fa; --card:#ffffff; --accent:#2f6bff; --ok:#1fa866; --bad:#e04455; --warn:#d98a1f; --text:#1a1d24; --muted:#5a6070; --optbg:#eef1f7; --pillbg:#eef1f7; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; min-height:100dvh; }
+  .wrap { max-width:520px; margin:0 auto; padding:12px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .card { background:var(--card); border-radius:16px; padding:16px; margin-bottom:12px; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  .muted { color:var(--muted); font-size:14px; }
+  input, button { font:inherit; }
+  input { width:100%; padding:14px; border-radius:12px; border:1px solid #2a2f3a; background:#0f1115; color:var(--text); font-size:16px; }
+  button { padding:14px 16px; border-radius:12px; border:0; background:var(--accent); color:#fff; cursor:pointer; font-weight:700; font-size:16px; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+
+  /* top bar */
+  .topbar { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:var(--pillbg); font-size:13px; color:var(--muted); }
+  .pill .dot { width:8px; height:8px; border-radius:50%; background:var(--bad); }
+  .pill.on .dot { background:var(--ok); }
+  .pill .nick { color:var(--text); font-weight:600; }
+
+  /* timer */
+  .timerWrap { position:relative; width:120px; height:120px; margin:0 auto 8px; }
+  .timerRing { width:100%; height:100%; transform:rotate(-90deg); }
+  .timerRing circle { fill:none; stroke-width:8; }
+  .timerRing .bg { stroke:#2a2f3a; }
+  .timerRing .fg { stroke:var(--ok); stroke-linecap:round; transition:stroke .3s; }
+  .timerNum { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:44px; font-weight:800; }
+  .progress { text-align:center; color:var(--muted); font-size:13px; margin-bottom:8px; }
+
+  .q { font-size:20px; font-weight:700; margin:10px 0 12px; line-height:1.3; }
+
+  .opts { display:grid; grid-template-columns:1fr; gap:10px; }
+  .opt { padding:16px; border-radius:14px; background:var(--optbg); color:var(--text); border:2px solid transparent; cursor:pointer; text-align:left; font-size:16px; font-weight:500; min-height:56px; display:flex; align-items:center; gap:10px; transition:transform .05s, border-color .15s, background .2s; }
+  .opt:active { transform:scale(.98); }
+  .opt .idx { width:28px; height:28px; border-radius:8px; background:#2a2f3a; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; }
+  .opt.correct { background:var(--ok); color:#06210f; border-color:var(--ok); }
+  .opt.correct .idx { background:rgba(0,0,0,.15); color:#06210f; }
+  .opt.wrong { background:var(--bad); color:#fff; border-color:var(--bad); }
+  .opt.wrong .idx { background:rgba(0,0,0,.2); color:#fff; }
+  .opt.chosen { border-color:var(--accent); }
+  .opt.locked { pointer-events:none; }
+
+  .feedback { margin-top:12px; text-align:center; font-size:15px; min-height:20px; }
+  .feedback.ok { color:var(--ok); font-weight:700; }
+  .feedback.bad { color:var(--bad); font-weight:700; }
+
+  .board { width:100%; border-collapse:collapse; font-size:14px; }
+  .board th, .board td { padding:8px 6px; text-align:left; border-bottom:1px solid #2a2f3a; }
+  .board th { color:var(--muted); font-size:12px; text-transform:uppercase; }
+  .board tr.me td { color:var(--accent); font-weight:700; }
+
+  .hidden { display:none !important; }
+
+  .lobbyHero { text-align:center; padding:8px 0 4px; }
+  .lobbyHero h1 { font-size:24px; }
+  .settings { display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-bottom:8px; }
+  .settings button { padding:6px 10px; font-size:13px; background:#2a2f3a; }
+
+  @media (min-width:560px) {
+    .opts { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="lobby" class="card">
+    <div class="lobbyHero">
+      <h1>Викторина</h1>
+      <p class="muted">Введи PIN игры и свой ник</p>
+    </div>
+    <input id="pin" placeholder="PIN игры" inputmode="numeric" autocomplete="off">
+    <div style="height:8px"></div>
+    <input id="nick" placeholder="Твой ник" autocomplete="off" maxlength="20">
+    <div style="height:12px"></div>
+    <button id="joinBtn" onclick="join()">Войти</button>
+    <div id="joinErr" class="muted" style="margin-top:8px;color:var(--bad)"></div>
+  </div>
+
+  <div id="game" class="hidden">
+    <div class="topbar" style="justify-content:space-between">
+      <button id="loginBtn" onclick="logout()" style="padding:6px 12px;font-size:13px;background:var(--pillbg);color:var(--text);border:0;border-radius:999px;cursor:pointer">Выйти</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="themeBtn" onclick="toggleTheme()" style="padding:6px 10px;font-size:13px;background:var(--pillbg);color:var(--text);border:0;border-radius:999px;cursor:pointer">🌙</button>
+        <button id="soundBtn" onclick="toggleSound()" style="padding:6px 10px;font-size:13px;background:var(--pillbg);color:var(--text);border:0;border-radius:999px;cursor:pointer">🔊</button>
+        <div class="pill" id="connPill"><span class="dot"></span><span id="connText">подключение...</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center">
+      <div class="muted" id="nickLabel" style="margin-bottom:6px;font-weight:600"></div>
+      <div class="progress" id="progress">—</div>
+      <div class="timerWrap">
+        <svg class="timerRing" viewBox="0 0 120 120">
+          <circle class="bg" cx="60" cy="60" r="54"></circle>
+          <circle class="fg" id="ring" cx="60" cy="60" r="54" stroke-dasharray="339.3" stroke-dashoffset="0"></circle>
+        </svg>
+        <div class="timerNum" id="timer">--</div>
+      </div>
+      <div class="q" id="qtext">Ожидаем вопрос...</div>
+      <div class="opts" id="opts"></div>
+      <div class="feedback" id="feedback"></div>
+      <div class="muted" id="answerProgress" style="text-align:center;margin-top:4px;font-size:13px"></div>
+    </div>
+
+    <div class="card">
+      <h1 style="font-size:16px">Таблица результатов</h1>
+      <table class="board"><thead><tr><th>#</th><th>Игрок</th><th>Викт.</th><th>Руч.</th><th>Всего</th></tr></thead><tbody id="boardBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io({ transports: ['websocket','polling'] });
+let playerId = null, pin = null, currentQ = null, answered = false, timerIv = null;
+let soundOn = true;
+let serverOffset = 0;
+let myNick = '';
+const CIRC = 2 * Math.PI * 54; // 339.29
+
+function join() {
+  pin = document.getElementById('pin').value.trim();
+  const nick = document.getElementById('nick').value.trim();
+  if (!pin || !nick) { document.getElementById('joinErr').textContent = 'Заполни поля'; return; }
+  myNick = nick;
+  socket.emit('join_game', { pin, nick });
+}
+function doJoin(p, n) {
+  pin = p; myNick = n;
+  document.getElementById('pin').value = p;
+  document.getElementById('nick').value = n;
+  socket.emit('join_game', { pin: p, nick: n });
+}
+function logout() {
+  localStorage.removeItem('fh_session');
+  location.reload();
+}
+// restore session on load
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    const s = JSON.parse(localStorage.getItem('fh_session') || 'null');
+    if (s && s.pin && s.nick) {
+      // wait for socket connect
+      const tryJoin = () => { if (socket.connected) doJoin(s.pin, s.nick); else setTimeout(tryJoin, 200); };
+      tryJoin();
+    }
+  } catch(e){}
+});
+socket.on('joined', d => {
+  playerId = d.playerId;
+  localStorage.setItem('fh_session', JSON.stringify({ pin, nick: d.nick, playerId: d.playerId }));
+  document.getElementById('lobby').classList.add('hidden');
+  document.getElementById('game').classList.remove('hidden');
+  document.getElementById('nickLabel').textContent = d.nick;
+});
+socket.on('error', d => {
+  // if join failed, clear bad session
+  if (d.msg && d.msg.includes('ник уже')) {
+    localStorage.removeItem('fh_session');
+  }
+  const el = document.getElementById('joinErr');
+  if (el) el.textContent = d.msg;
+});
+
+socket.on('connect', () => {
+  setConn(true);
+  // if we were in a game and got disconnected, rejoin
+  try {
+    const s = JSON.parse(localStorage.getItem('fh_session') || 'null');
+    if (s && s.pin && s.nick && document.getElementById('lobby').classList.contains('hidden')) {
+      doJoin(s.pin, s.nick);
+    }
+  } catch(e){}
+});
+socket.on('disconnect', () => setConn(false));
+// reconnect handling
+socket.io.on('reconnect', () => {
+  try {
+    const s = JSON.parse(localStorage.getItem('fh_session') || 'null');
+    if (s && s.pin && s.nick) doJoin(s.pin, s.nick);
+  } catch(e){}
+});
+function setConn(on) {
+  const pill = document.getElementById('connPill');
+  const txt = document.getElementById('connText');
+  if (!pill) return;
+  pill.classList.toggle('on', on);
+  txt.textContent = on ? 'онлайн' : 'нет связи';
+}
+
+socket.on('question_open', d => {
+  currentQ = d.id;
+  answered = false;
+  serverOffset = (d.serverTime || Date.now()) - Date.now();
+  document.getElementById('qtext').textContent = d.text;
+  document.getElementById('progress').textContent = 'Вопрос ' + d.index + ' из ' + d.total;
+  const opts = document.getElementById('opts');
+  opts.innerHTML = '';
+  d.opts.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.innerHTML = `<span class="idx">${i+1}</span><span>${escapeHtml(o)}</span>`;
+    b.onclick = () => answer(i, b);
+    opts.appendChild(b);
+  });
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('answerProgress').textContent = '';
+  startTimer(d.endsAt, d.time);
+  try { if (soundOn) beep(660, 120); } catch(e){}
+});
+
+function startTimer(endsAt, totalSec) {
+  if (timerIv) clearInterval(timerIv);
+  const adjEnds = endsAt - serverOffset;
+  const ring = document.getElementById('ring');
+  const tick = () => {
+    const leftMs = Math.max(0, adjEnds - Date.now());
+    const left = Math.ceil(leftMs / 1000);
+    document.getElementById('timer').textContent = left;
+    const frac = totalSec > 0 ? Math.min(1, leftMs / (totalSec * 1000)) : 0;
+    ring.style.strokeDashoffset = CIRC * (1 - frac);
+    // color
+    let color = 'var(--ok)';
+    if (frac < 0.33) color = 'var(--bad)';
+    else if (frac < 0.66) color = 'var(--warn)';
+    ring.style.stroke = color;
+    document.getElementById('timer').style.color = color;
+    if (left <= 3 && left > 0) {
+      try { if (soundOn) beep(880, 80); } catch(e){}
+      try { navigator.vibrate && navigator.vibrate(40); } catch(e){}
+    }
+    if (left <= 0) clearInterval(timerIv);
+  };
+  tick();
+  timerIv = setInterval(tick, 100);
+}
+
+function answer(choice, btn) {
+  if (answered) return;
+  answered = true;
+  document.querySelectorAll('.opt').forEach(b => { b.classList.add('locked'); });
+  if (btn) btn.classList.add('chosen');
+  socket.emit('answer', { pin, playerId, questionId: currentQ, choice });
+  document.getElementById('feedback').textContent = 'Ответ принят. Ждём результат...';
+  try { navigator.vibrate && navigator.vibrate(20); } catch(e){}
+}
+
+socket.on('answer_ack', () => {});
+socket.on('answer_progress', d => {
+  const el = document.getElementById('answerProgress');
+  if (el) el.textContent = 'Ответили: ' + d.answered + ' из ' + d.total;
+});
+
+socket.on('reveal', d => {
+  if (timerIv) { clearInterval(timerIv); timerIv = null; }
+  document.getElementById('timer').textContent = '0';
+  const ring = document.getElementById('ring');
+  if (ring) ring.style.strokeDashoffset = CIRC;
+  const correct = d.correct;
+  document.querySelectorAll('.opt').forEach((b, i) => {
+    b.classList.add('locked');
+    if (i === correct) b.classList.add('correct');
+    else if (b.classList.contains('chosen')) b.classList.add('wrong');
+  });
+  // determine if user's chosen was correct
+  const chosenBtn = document.querySelector('.opt.chosen');
+  const chosenIdx = chosenBtn ? Array.from(document.querySelectorAll('.opt')).indexOf(chosenBtn) : -1;
+  const fb = document.getElementById('feedback');
+  if (chosenIdx === correct && chosenIdx >= 0) {
+    fb.textContent = 'Верно! ✓';
+    fb.className = 'feedback ok';
+    try { if (soundOn) beep(1046, 200); } catch(e){}
+    try { navigator.vibrate && navigator.vibrate([30,50,30]); } catch(e){}
+  } else if (chosenIdx >= 0) {
+    fb.textContent = 'Неверно ✗';
+    fb.className = 'feedback bad';
+    try { if (soundOn) beep(220, 250); } catch(e){}
+  } else {
+    fb.textContent = 'Время вышло';
+    fb.className = 'feedback bad';
+  }
+  document.getElementById('progress').textContent += '  •  ответ: ' + (correct + 1);
+});
+
+socket.on('finished', () => {
+  if (timerIv) { clearInterval(timerIv); timerIv = null; }
+  document.getElementById('timer').textContent = '';
+  document.getElementById('qtext').textContent = 'Игра завершена!';
+  document.getElementById('progress').textContent = 'Финиш';
+  document.getElementById('opts').innerHTML = '';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('answerProgress').textContent = '';
+});
+
+socket.on('stopped', () => {
+  document.getElementById('qtext').textContent = 'Игра остановлена';
+});
+
+socket.on('leaderboard', rows => {
+  const tb = document.getElementById('boardBody');
+  tb.innerHTML = '';
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    if (r.nick === myNick) tr.classList.add('me');
+    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(r.nick)}</td><td>${r.correct}</td><td>${r.manual}</td><td><b>${r.total}</b></td>`;
+    tb.appendChild(tr);
+  });
+});
+
+function toggleSound() {
+  soundOn = !soundOn;
+  document.getElementById('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+}
+// theme
+(function initTheme(){
+  const t = localStorage.getItem('fh_theme') || 'dark';
+  if (t === 'light') document.body.classList.add('light');
+  updateThemeBtn();
+})();
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('fh_theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  updateThemeBtn();
+}
+function updateThemeBtn() {
+  const b = document.getElementById('themeBtn');
+  if (b) b.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+}
+// SW registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+
+// simple web audio beep
+let audioCtx = null;
+function beep(freq, dur) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = freq;
+    o.type = 'sine';
+    g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur/1000);
+    o.start(); o.stop(audioCtx.currentTime + dur/1000);
+  } catch(e){}
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

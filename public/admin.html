@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<title>Админка</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --accent:#4f8cff; --ok:#3dd68c; --bad:#ff5d6c; --text:#e8eaf0; --muted:#8a8f9e; --optbg:#22262f; }
+  body.light { --bg:#f2f4fa; --card:#ffffff; --accent:#2f6bff; --ok:#1fa866; --bad:#e04455; --text:#1a1d24; --muted:#5a6070; --optbg:#eef1f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:900px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border-radius:16px; padding:16px; margin-bottom:16px; }
+  h1,h2 { margin:0 0 8px; }
+  .muted { color:var(--muted); font-size:14px; }
+  input, select, button, textarea { font:inherit; }
+  input, select, textarea { width:100%; padding:10px; border-radius:8px; border:1px solid #2a2f3a; background:#0f1115; color:var(--text); margin:4px 0; }
+  button { padding:10px 14px; border-radius:8px; border:0; background:var(--accent); color:#fff; cursor:pointer; font-weight:600; margin:4px 4px 4px 0; }
+  button.danger { background:var(--bad); }
+  button.ghost { background:#2a2f3a; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .tab { padding:8px 14px; border-radius:8px; background:#2a2f3a; cursor:pointer; }
+  .tab.active { background:var(--accent); }
+  .section { display:none; }
+  .section.active { display:block; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:8px; border-bottom:1px solid #2a2f3a; text-align:left; }
+  .qitem { background:#22262f; border-radius:10px; padding:10px; margin:8px 0; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="loginCard" class="card">
+    <h1>Вход админа</h1>
+    <input id="pw" type="password" placeholder="Пароль">
+    <button onclick="login()">Войти</button>
+    <div id="loginErr" class="muted" style="color:var(--bad)"></div>
+  </div>
+
+  <div id="admin" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h1>Админ-пульт</h1>
+        <button id="themeBtn" onclick="toggleTheme()" style="padding:6px 10px;font-size:13px;background:var(--optbg);color:var(--text);border:0;border-radius:8px;cursor:pointer">🌙</button>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="showTab('games')">Игры</div>
+        <div class="tab" onclick="showTab('control')">Управление</div>
+        <div class="tab" onclick="showTab('questions')">Вопросы</div>
+        <div class="tab" onclick="showTab('manual')">Ручные баллы</div>
+        <div class="tab" onclick="showTab('board')">Рейтинг</div>
+        <div class="tab" onclick="showTab('players')">Игроки</div>
+        <div class="tab" onclick="showTab('history')">История</div>
+      </div>
+    </div>
+
+    <!-- GAMES -->
+    <div id="tab-games" class="section active">
+      <div class="card">
+        <h2>Создать игру</h2>
+        <div class="row">
+          <input id="newPin" placeholder="PIN (пусто = случайный)" style="flex:1">
+          <button onclick="createGame()">Создать</button>
+        </div>
+        <div id="createRes" class="muted"></div>
+      </div>
+      <div class="card">
+        <h2>Игры</h2>
+        <table><thead><tr><th>PIN</th><th>Статус</th><th>Вопросов</th><th>Игроков</th><th></th></tr></thead><tbody id="gamesBody"></tbody></table>
+        <button class="ghost" onclick="loadGames()">Обновить</button>
+      </div>
+    </div>
+
+    <!-- CONTROL -->
+    <div id="tab-control" class="section">
+      <div class="card">
+        <h2>Управление игрой</h2>
+        <div class="row">
+          <input id="ctrlPin" placeholder="PIN игры" style="flex:1">
+          <button onclick="joinAdminRoom()">Подключить</button>
+        </div>
+        <div id="ctrlStatus" class="muted"></div>
+        <div style="height:8px"></div>
+        <div class="row">
+          <button onclick="act('admin_start')">Старт</button>
+          <button onclick="act('admin_next')">Следующий вопрос</button>
+          <button onclick="act('admin_reveal')">Показать ответ</button>
+          <button class="danger" onclick="act('admin_stop')">Стоп</button>
+        </div>
+        <div id="ctrlInfo" class="muted" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- QUESTIONS -->
+    <div id="tab-questions" class="section">
+      <div class="card">
+        <h2>Добавить вопрос</h2>
+        <input id="qPin" placeholder="PIN игры">
+        <textarea id="qText" placeholder="Текст вопроса"></textarea>
+        <input id="qOpt1" placeholder="Вариант 1">
+        <input id="qOpt2" placeholder="Вариант 2">
+        <input id="qOpt3" placeholder="Вариант 3">
+        <input id="qOpt4" placeholder="Вариант 4">
+        <div class="row">
+          <select id="qCorrect" style="flex:1">
+            <option value="0">Правильный: 1</option>
+            <option value="1">Правильный: 2</option>
+            <option value="2">Правильный: 3</option>
+            <option value="3">Правильный: 4</option>
+          </select>
+          <input id="qTime" type="number" value="20" style="flex:1" placeholder="Секунд">
+        </div>
+        <button onclick="addQuestion()">Добавить</button>
+        <button class="ghost" onclick="seedGeo()">Загрузить 12 вопросов по географии</button>
+        <div id="qRes" class="muted"></div>
+      </div>
+      <div class="card">
+        <h2>Вопросы игры</h2>
+        <input id="qListPin" placeholder="PIN игры" oninput="loadQuestions()">
+        <div id="qList"></div>
+      </div>
+    </div>
+
+    <!-- MANUAL -->
+    <div id="tab-manual" class="section">
+      <div class="card">
+        <h2>Внести ручные баллы</h2>
+        <input id="mPin" placeholder="PIN игры">
+        <select id="mPlayer"></select>
+        <input id="mContest" placeholder="Конкурс (название)" value="Живой конкурс">
+        <input id="mPoints" type="number" placeholder="Баллы">
+        <input id="mComment" placeholder="Комментарий">
+        <button onclick="loadPlayersForManual()">Обновить игроков</button>
+        <button onclick="addManual()">Добавить</button>
+        <div id="mRes" class="muted"></div>
+      </div>
+      <div class="card">
+        <h2>Ручные баллы</h2>
+        <input id="mListPin" placeholder="PIN игры" oninput="loadManual()">
+        <div id="mList"></div>
+      </div>
+    </div>
+
+    <!-- BOARD -->
+    <div id="tab-board" class="section">
+      <div class="card">
+        <h2>Рейтинг</h2>
+        <input id="bPin" placeholder="PIN игры" oninput="loadBoard()">
+        <table><thead><tr><th>#</th><th>Игрок</th><th>Викторина</th><th>Ручные</th><th>Всего</th></tr></thead><tbody id="boardBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- PLAYERS -->
+    <div id="tab-players" class="section">
+      <div class="card">
+        <h2>Игроки</h2>
+        <input id="pPin" placeholder="PIN игры" oninput="loadPlayers()">
+        <div id="playersList"></div>
+        <button class="ghost" onclick="loadPlayers()">Обновить</button>
+      </div>
+    </div>
+
+    <div id="tab-history" class="section">
+      <div class="card">
+        <h2>История игр</h2>
+        <button class="ghost" onclick="loadHistory()">Обновить</button>
+        <button class="ghost" onclick="window.open('/api/backup','_blank')">Скачать бэкап БД</button>
+        <div id="historyList" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let adminPin = null;
+
+function login() {
+  const pw = document.getElementById('pw').value;
+  fetch('/api/admin/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:pw}) })
+    .then(r=>r.json()).then(d=>{
+      if (d.ok) { document.getElementById('loginCard').classList.add('hidden'); document.getElementById('admin').classList.remove('hidden'); socket.emit('admin_join', {password:pw}); loadGames(); }
+      else document.getElementById('loginErr').textContent = 'Неверный пароль';
+    });
+}
+
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function createGame() {
+  const pin = document.getElementById('newPin').value.trim();
+  fetch('/api/games', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({pin: pin||undefined}) })
+    .then(r=>r.json()).then(d=>{
+      if (d.ok) { document.getElementById('createRes').textContent = 'Создана игра PIN: ' + d.pin; loadGames(); }
+      else document.getElementById('createRes').textContent = d.error;
+    });
+}
+
+function loadGames() {
+  fetch('/api/games', { credentials:'include' }).then(r=>r.json()).then(games=>{
+    const tb = document.getElementById('gamesBody');
+    tb.innerHTML = '';
+    games.forEach(g => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><b>${g.pin}</b></td><td>${g.status}</td><td>-</td><td>-</td><td><button class="ghost" onclick="selectPin('${g.pin}')">Выбрать</button></td>`;
+      tb.appendChild(tr);
+    });
+  });
+}
+
+function selectPin(pin) {
+  document.getElementById('ctrlPin').value = pin;
+  document.getElementById('qPin').value = pin;
+  document.getElementById('qListPin').value = pin;
+  document.getElementById('mPin').value = pin;
+  document.getElementById('mListPin').value = pin;
+  document.getElementById('bPin').value = pin;
+  document.getElementById('pPin').value = pin;
+  loadQuestions(); loadManual(); loadBoard(); loadPlayers();
+}
+
+function joinAdminRoom() {
+  const pin = document.getElementById('ctrlPin').value.trim();
+  adminPin = pin;
+  socket.emit('join_room_admin', {pin});
+  document.getElementById('ctrlStatus').textContent = 'подключено к ' + pin;
+}
+
+function act(ev) {
+  if (!adminPin) { alert('Сначала подключись к игре'); return; }
+  socket.emit(ev, {pin: adminPin});
+}
+
+socket.on('state', d => {
+  document.getElementById('ctrlInfo').textContent = 'Статус: ' + d.status + ' | вопрос ' + d.current + '/' + d.total;
+});
+socket.on('answer_progress', d => {
+  const el = document.getElementById('ctrlInfo');
+  if (el) el.textContent += ' | ответили ' + d.answered + '/' + d.total;
+});
+socket.on('leaderboard', rows => {
+  // update board tab if visible
+  const tb = document.getElementById('boardBody');
+  if (!tb) return;
+  if (document.getElementById('bPin').value.trim() !== (adminPin||'')) return;
+  tb.innerHTML = '';
+  rows.forEach((r,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${esc(r.nick)}</td><td>${r.correct}</td><td>${r.manual}</td><td><b>${r.total}</b></td>`;
+    tb.appendChild(tr);
+  });
+});
+
+function addQuestion() {
+  const body = {
+    pin: document.getElementById('qPin').value.trim(),
+    text: document.getElementById('qText').value.trim(),
+    opts: [document.getElementById('qOpt1').value, document.getElementById('qOpt2').value, document.getElementById('qOpt3').value, document.getElementById('qOpt4').value],
+    correct: document.getElementById('qCorrect').value,
+    time: document.getElementById('qTime').value
+  };
+  fetch('/api/questions', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('qRes').textContent = d.ok ? 'Добавлено' : d.error;
+      if (d.ok) loadQuestions();
+    });
+}
+
+function loadQuestions() {
+  const pin = document.getElementById('qListPin').value.trim();
+  if (!pin) return;
+  fetch('/api/games/'+pin, { credentials:'include' }).then(r=>r.json()).then(d=>{
+    const list = document.getElementById('qList');
+    list.innerHTML = '';
+    (d.questions||[]).forEach(q => {
+      const div = document.createElement('div');
+      div.className = 'qitem';
+      div.innerHTML = `<b>${esc(q.text)}</b><br><span class="muted">1) ${esc(q.opt1)} 2) ${esc(q.opt2)} 3) ${esc(q.opt3)} 4) ${esc(q.opt4)} | правильный: ${q.correct+1} | ${q.time_limit}s</span> <button class="danger" onclick="delQ(${q.id})">Удалить</button>`;
+      list.appendChild(div);
+    });
+  });
+}
+
+function delQ(id) {
+  fetch('/api/questions/'+id, { method:'DELETE', credentials:'include' }).then(()=>loadQuestions());
+}
+function seedGeo() {
+  const pin = document.getElementById('qPin').value.trim() || document.getElementById('qListPin').value.trim();
+  if (!pin) { alert('Укажи PIN игры'); return; }
+  fetch('/api/seed-geo', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({pin}) })
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('qRes').textContent = d.ok ? ('Добавлено: ' + d.added) : d.error;
+      if (d.ok) loadQuestions();
+    });
+}
+
+function loadPlayersForManual() {
+  const pin = document.getElementById('mPin').value.trim();
+  fetch('/api/games/'+pin, { credentials:'include' }).then(r=>r.json()).then(d=>{
+    const sel = document.getElementById('mPlayer');
+    sel.innerHTML = '';
+    (d.players||[]).forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.nick;
+      sel.appendChild(o);
+    });
+  });
+}
+
+function addManual() {
+  const body = {
+    pin: document.getElementById('mPin').value.trim(),
+    playerId: document.getElementById('mPlayer').value,
+    contest: document.getElementById('mContest').value,
+    points: document.getElementById('mPoints').value,
+    comment: document.getElementById('mComment').value
+  };
+  fetch('/api/manual', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) })
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('mRes').textContent = d.ok ? 'Добавлено' : d.error;
+      if (d.ok) loadManual();
+    });
+}
+
+function loadManual() {
+  const pin = document.getElementById('mListPin').value.trim();
+  if (!pin) return;
+  fetch('/api/manual/'+pin, { credentials:'include' }).then(r=>r.json()).then(rows=>{
+    const list = document.getElementById('mList');
+    list.innerHTML = '';
+    (rows||[]).forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'qitem';
+      div.innerHTML = `${esc(m.nick)}: <b>${m.points}</b> (${esc(m.contest)}) ${esc(m.comment||'')} <button class="danger" onclick="delManual(${m.id})">Удалить</button>`;
+      list.appendChild(div);
+    });
+  });
+}
+
+function delManual(id) {
+  fetch('/api/manual/'+id, { method:'DELETE', credentials:'include' }).then(()=>loadManual());
+}
+
+function loadBoard() {
+  const pin = document.getElementById('bPin').value.trim();
+  if (!pin) return;
+  fetch('/api/games/'+pin, { credentials:'include' }).then(r=>r.json()).then(d=>{
+    const tb = document.getElementById('boardBody');
+    tb.innerHTML = '';
+    (d.leaderboard||[]).forEach((r,i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i+1}</td><td>${esc(r.nick)}</td><td>${r.correct}</td><td>${r.manual}</td><td><b>${r.total}</b></td>`;
+      tb.appendChild(tr);
+    });
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('fh_theme', document.body.classList.contains('light') ? 'light' : 'dark');
+  const b = document.getElementById('themeBtn');
+  if (b) b.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+}
+(function initTheme(){
+  const t = localStorage.getItem('fh_theme') || 'dark';
+  if (t === 'light') document.body.classList.add('light');
+  const b = document.getElementById('themeBtn');
+  if (b) b.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+})();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
+function loadPlayers() {
+  const pin = document.getElementById('pPin').value.trim();
+  if (!pin) return;
+  fetch('/api/games/'+pin, { credentials:'include' }).then(r=>r.json()).then(d=>{
+    const list = document.getElementById('playersList');
+    list.innerHTML = '';
+    (d.players||[]).forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'qitem';
+      div.innerHTML = `${esc(p.nick)} <button class="danger" onclick="kickPlayer(${p.id})">Исключить</button>`;
+      list.appendChild(div);
+    });
+    if (!(d.players||[]).length) list.innerHTML = '<div class="muted">Нет игроков</div>';
+  });
+}
+function kickPlayer(id) {
+  if (!confirm('Исключить игрока?')) return;
+  fetch('/api/players/'+id, { method:'DELETE', credentials:'include' }).then(()=>loadPlayers());
+}
+function loadHistory() {
+  fetch('/api/games', { credentials:'include' }).then(r=>r.json()).then(games=>{
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+    games.forEach(g => {
+      const div = document.createElement('div');
+      div.className = 'qitem';
+      const date = new Date(g.created_at).toLocaleString();
+      div.innerHTML = `<b>PIN ${g.pin}</b> — ${g.status} — ${date}
+        <div style="margin-top:6px">
+          <button class="ghost" onclick="viewHistory('${g.pin}')">Результаты</button>
+          <button class="ghost" onclick="window.open('/api/export/${g.pin}','_blank')">Экспорт CSV</button>
+        </div>
+        <div id="hist-${g.pin}" style="margin-top:8px"></div>`;
+      list.appendChild(div);
+    });
+    if (!games.length) list.innerHTML = '<div class="muted">Нет игр</div>';
+  });
+}
+function viewHistory(pin) {
+  fetch('/api/games/'+pin, { credentials:'include' }).then(r=>r.json()).then(d=>{
+    const el = document.getElementById('hist-'+pin);
+    if (!el) return;
+    el.innerHTML = '<table style="width:100%;font-size:13px"><thead><tr><th>#</th><th>Игрок</th><th>Викт.</th><th>Руч.</th><th>Всего</th></tr></thead><tbody>' +
+      (d.leaderboard||[]).map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.nick)}</td><td>${r.correct}</td><td>${r.manual}</td><td><b>${r.total}</b></td></tr>`).join('') +
+      '</tbody></table>';
+  });
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

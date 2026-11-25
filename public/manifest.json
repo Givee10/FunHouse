@@ -1,0 +1,13 @@
+{
+  "name": "FunHouse Quiz",
+  "short_name": "Quiz",
+  "description": "Викторина и таблица результатов",
+  "start_url": "/play.html",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
