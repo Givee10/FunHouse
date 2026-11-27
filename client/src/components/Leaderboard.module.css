@@ -1,0 +1,4 @@
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.th { padding: 8px; text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.td { padding: 8px; border-bottom: 1px solid #2a2f3a; }
+.me { color: var(--accent); font-weight: 700; }

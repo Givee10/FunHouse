@@ -8,3 +8,20 @@ data.db-shm
 cookies.txt
 *.log
 .vscode/.history/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+assets
+*.ppt
+*.pptx
+*.txt
+__pycache__/
+*.pyc

@@ -8,6 +8,8 @@ export default function Admin() {
 
   const [tab, setTab] = useState('games');
   const [games, setGames] = useState<any[]>([]);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortKey, setSortKey] = useState('date');
   const [pin, setPin] = useState('');
   const [ctrlPin, setCtrlPin] = useState('');
   const [status, setStatus] = useState('');
@@ -155,10 +157,27 @@ export default function Admin() {
           <h2>Создать игру</h2>
           <button onClick={createGame} style={{ padding: '10px 14px', borderRadius: 8, border: 0, background: '#4f8cff', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Создать</button>
           <h2 style={{ marginTop: 16 }}>Игры</h2>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #2a2f3a', background: '#0f1115', color: '#e8eaf0' }}>
+              <option value="all">Все статусы</option>
+              <option value="lobby">lobby</option>
+              <option value="open">open</option>
+              <option value="reveal">reveal</option>
+              <option value="finished">finished</option>
+            </select>
+            <select value={sortKey} onChange={e => setSortKey(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #2a2f3a', background: '#0f1115', color: '#e8eaf0' }}>
+              <option value="date">По дате</option>
+              <option value="pin">По PIN</option>
+              <option value="status">По статусу</option>
+            </select>
+          </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead><tr><th style={{ padding: 8, textAlign: 'left' }}>PIN</th><th style={{ padding: 8, textAlign: 'left' }}>Статус</th><th style={{ padding: 8, textAlign: 'left' }}></th></tr></thead>
             <tbody>
-              {games.map(g => (
+              {games
+                .filter(g => filterStatus === 'all' || g.status === filterStatus)
+                .sort((a, b) => sortKey === 'pin' ? a.pin.localeCompare(b.pin) : sortKey === 'status' ? a.status.localeCompare(b.status) : b.created_at - a.created_at)
+                .map(g => (
                 <tr key={g.id}><td style={{ padding: 8 }}><b>{g.pin}</b></td><td style={{ padding: 8 }}>{g.status}</td><td style={{ padding: 8 }}><button onClick={() => selectPin(g.pin)} style={{ padding: '6px 10px', borderRadius: 6, border: 0, background: '#2a2f3a', color: '#fff', cursor: 'pointer' }}>Выбрать</button></td></tr>
               ))}
             </tbody>

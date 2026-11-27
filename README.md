@@ -3,7 +3,13 @@
 Простая викторина + таблица результатов конкурсов. Один процесс Node.js, без внешних сервисов.
 База — локальный SQLite-файл `data.db`.
 
-## Запуск
+## Ветки репозитория
+
+- `vanilla` — текущее рабочее решение (vanilla JS + Express + Socket.io). Запуск: `git checkout vanilla && npm install && npm start`.
+- `react` — миграция на React (Vite) + TypeScript. Запуск: `git checkout react && npm install && npm run dev` (поднимает сервер и Vite dev-сервер). Прод-сборка: `npm run build` (собирает клиент в `client/dist`), затем `npm start`.
+- `main` — план миграции (`PLAN_REACT.md`) и CI-пример.
+
+## Запуск (ветка `vanilla`)
 
 1. Установи Node.js 22+ (https://nodejs.org)
 2. В папке проекта:
@@ -20,6 +26,14 @@
    - Любой ОС: `npm start`
 
 Открой http://localhost:3000/admin
+
+## Запуск (ветка `react`)
+
+1. `git checkout react`
+2. `npm install` (корень) и `cd client && npm install`
+3. Создай `.env` в корне (как выше).
+4. Разработка: `npm run dev` (сервер + Vite на 5173, прокси `/api` и `/socket.io`).
+5. Продакшен: `npm run build` затем `npm start` (Express раздаёт `client/dist`).
 
 ## Страницы
 

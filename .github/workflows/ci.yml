@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main, react, vanilla]
   pull_request:
     branches: [main]
 
