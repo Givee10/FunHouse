@@ -19,7 +19,13 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.static('client/dist'));
 app.use(express.static('public'));
+// SPA fallback
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return res.status(404).end();
+  res.sendFile('index.html', { root: 'client/dist' });
+});
 
 // ---------- helpers ----------
 function getGameByPin(pin) {
