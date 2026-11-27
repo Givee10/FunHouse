@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, react, vanilla]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:client
+      - run: node -c server.js
+
+  # Деплой (раскомментировать при настройке хостинга)
+  # deploy:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: npm ci && npm run build:client
+  #     - uses: some-deploy-action@v1
+  #       with:
+  #         token: ${{ secrets.DEPLOY_TOKEN }}
